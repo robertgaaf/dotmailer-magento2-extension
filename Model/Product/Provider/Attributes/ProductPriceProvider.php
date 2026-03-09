@@ -106,7 +106,9 @@ class ProductPriceProvider implements ProductPriceProviderInterface
         if (!$product) {
             return 0.0;
         }
-
+        if ($product->getPrice() <= $product->getFinalPrice()) {
+            return 0.0;
+        }
         $price = $product->getFinalPrice();
 
         return (float) $price;
@@ -120,6 +122,9 @@ class ProductPriceProvider implements ProductPriceProviderInterface
         /** @var Product $product */
         $product = $this->productSaleProvider->getProduct();
         if (!$product) {
+            return 0.0;
+        }
+        if ($product->getPrice() <= $product->getFinalPrice()) {
             return 0.0;
         }
 

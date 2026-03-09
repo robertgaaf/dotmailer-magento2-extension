@@ -1,3 +1,8 @@
+# 4.34.1
+
+### Bug fixes
+- Product special prices in web insight data will be set to zero if there is no discount.
+
 # 4.34.0
 
 ### Improvements
