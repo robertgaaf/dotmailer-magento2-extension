@@ -263,9 +263,130 @@ class DataFieldCollectorTest extends TestCase
                 [
                     'Key' => 'CUSTOMER_ID',
                     'Value' => '10',
-                ]
+                ],
             ],
             $merged
+        );
+    }
+
+    /**
+     * Regression test for bug where data fields were not flattened before passing to SdkContact.
+     *
+     * This test ensures the proper workflow:
+     * 1. mergeFields() returns structured format [['Key' => 'X', 'Value' => 'Y']]
+     * 2. flatten() converts to simple associative array ['X' => 'Y']
+     * 3. The flattened format is compatible with SdkContact::setDataFields()
+     *
+     * If the structured format were passed directly to setDataFields() (the original bug),
+     * the API request would break with keys like '0', '1' and values like 'Array'.
+     *
+     * @return void
+     * @throws \Exception
+     */
+    public function testMergeFieldsReturnsFormatCompatibleWithSdkContact()
+    {
+        // Step 1: Merge fields (returns structured format)
+        $merged = $this->dataFieldCollector->mergeFields(
+            $this->getDefaultDataFields(),
+            $this->getExportedCustomerDataFields()
+        );
+
+        // Verify we got structured format (array of arrays)
+        $this->assertIsArray($merged);
+        $this->assertCount(6, $merged);
+        $this->assertArrayHasKey('Key', $merged[0]);
+        $this->assertArrayHasKey('Value', $merged[0]);
+        $this->assertEquals('STORE_NAME', $merged[0]['Key']);
+
+        // Step 2: Flatten the structured format for SDK compatibility
+        $flattened = $this->dataFieldCollector->flatten($merged);
+
+        // Verify flattened is a simple associative array
+        $this->assertIsArray($flattened);
+        $this->assertArrayHasKey('STORE_NAME', $flattened);
+        $this->assertArrayHasKey('FIRST_NAME', $flattened);
+        $this->assertEquals('Chaz store', $flattened['STORE_NAME']);
+
+        // Step 3: Verify the flattened format works with SdkContact
+        $sdkContact = new SdkContact();
+        $sdkContact->setMatchIdentifier('email');
+        $sdkContact->setIdentifiers(['email' => 'test@example.com']);
+        $sdkContact->setDataFields($flattened);
+
+        // Verify the data fields were set correctly
+        $dataFields = $sdkContact->getDataFields();
+        $this->assertInstanceOf(DataFieldCollection::class, $dataFields);
+
+        // The SDK converts our array into a DataFieldCollection
+        $items = $dataFields->all();
+        $this->assertCount(6, $items);
+
+        // Verify individual fields exist with correct values
+        $fieldKeys = array_map(function ($item) {
+            return $item->getKey();
+        }, $items);
+
+        $this->assertContains('STORE_NAME', $fieldKeys);
+        $this->assertContains('FIRST_NAME', $fieldKeys);
+        $this->assertContains('CUSTOMER_ID', $fieldKeys);
+
+        // Find and verify specific field values
+        foreach ($items as $item) {
+            if ($item->getKey() === 'STORE_NAME') {
+                $this->assertEquals('Chaz store', $item->getValue());
+            }
+            if ($item->getKey() === 'FIRST_NAME') {
+                $this->assertEquals('Chaz', $item->getValue());
+            }
+            if ($item->getKey() === 'CUSTOMER_ID') {
+                $this->assertEquals('10', $item->getValue());
+            }
+        }
+    }
+
+    public function testFlattenConvertsStructuredArrayToAssociativeArray()
+    {
+        $structuredDataFields = [
+            ['Key' => 'STORE_NAME', 'Value' => 'Chaz store'],
+            ['Key' => 'WEBSITE_NAME', 'Value' => 'Chaz website'],
+            ['Key' => 'FIRST_NAME', 'Value' => 'Chaz'],
+            ['Key' => 'CUSTOMER_ID', 'Value' => '10'],
+        ];
+
+        $flattened = $this->dataFieldCollector->flatten($structuredDataFields);
+
+        $this->assertEquals(
+            [
+                'STORE_NAME' => 'Chaz store',
+                'WEBSITE_NAME' => 'Chaz website',
+                'FIRST_NAME' => 'Chaz',
+                'CUSTOMER_ID' => '10',
+            ],
+            $flattened
+        );
+    }
+
+    public function testFlattenSkipsInvalidEntries()
+    {
+        $structuredDataFields = [
+            ['Key' => 'VALID_FIELD', 'Value' => 'Valid value'],
+            ['Key' => '', 'Value' => 'Empty key'],  // Invalid: empty key
+            ['Value' => 'Missing key'],              // Invalid: no Key
+            ['Key' => 'Missing value'],              // Invalid: no Value
+            'not an array',                          // Invalid: not an array
+            ['Key' => 123, 'Value' => 'Numeric key'], // Invalid: numeric key
+            ['Key' => 'ANOTHER_VALID', 'Value' => 'Another value'],
+        ];
+
+        $flattened = $this->dataFieldCollector->flatten($structuredDataFields);
+
+        // Should only include the two valid entries
+        $this->assertEquals(
+            [
+                'VALID_FIELD' => 'Valid value',
+                'ANOTHER_VALID' => 'Another value',
+            ],
+            $flattened
         );
     }
 

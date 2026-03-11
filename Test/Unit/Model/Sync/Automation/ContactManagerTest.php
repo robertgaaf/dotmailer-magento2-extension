@@ -634,6 +634,94 @@ class ContactManagerTest extends TestCase
         );
     }
 
+    public function testAutomationDataFieldsAreUsedWhenNoAddressBookConditionsAreMet()
+    {
+        $email = 'chaz@emailsim.io';
+        $contactId = 123456;
+        $automationDataFields = $this->getDefaultDataFields();
+
+        $this->contactModelMock->expects($this->once())
+            ->method('getEmail')
+            ->willReturn($email);
+
+        $this->contactModelMock->expects($this->atLeastOnce())
+            ->method('getWebsiteId')
+            ->willReturn('1');
+
+        // Ensure we don't qualify for customer address book
+        $this->contactModelMock->expects($this->once())
+            ->method('getCustomerId')
+            ->willReturn(0);
+
+        // Ensure we don't qualify for guest address book
+        $this->contactModelMock->expects($this->once())
+            ->method('getIsGuest')
+            ->willReturn(0);
+
+        $this->subscriberModelMock->expects($this->any())
+            ->method('isSubscribed')
+            ->willReturn(false);
+
+        // DataFieldCollector should NOT be called for customer or guest
+        $this->dataFieldCollectorMock->expects($this->never())
+            ->method('collectForCustomer');
+
+        $this->dataFieldCollectorMock->expects($this->never())
+            ->method('collectForGuest');
+
+        $this->dataFieldCollectorMock->expects($this->never())
+            ->method('mergeFields');
+
+        // DataFieldCollector SHOULD be called to flatten the automation data fields
+        $this->dataFieldCollectorMock->expects($this->once())
+            ->method('flatten')
+            ->with($automationDataFields)
+            ->willReturn([
+                'STORE_NAME' => 'Chaz store',
+                'WEBSITE_NAME' => 'Chaz website',
+            ]);
+
+        // Setup V3 client mocks
+        $sdkContact = $this->createMock(ContactModel::class);
+        $this->sdkContactFactoryMock->expects($this->once())
+            ->method('create')
+            ->willReturn($sdkContact);
+
+        $this->clientFactoryMock->expects($this->once())
+            ->method('create')
+            ->with(['data' => ['websiteId' => 1]])
+            ->willReturn($this->v3ClientMock);
+
+        $responseContact = $this->createContactModelWithChannelProperties(
+            $contactId,
+            StatusInterface::SUBSCRIBED
+        );
+
+        $contactsResourceMock = $this->createMock(Contacts::class);
+        $this->v3ClientMock->method('__get')
+            ->with('contacts')
+            ->willReturn($contactsResourceMock);
+        $contactsResourceMock->expects($this->once())
+            ->method('patchByIdentifier')
+            ->willReturn($responseContact);
+
+        // Contact should NOT be marked as imported since no address book was used
+        $this->contactModelMock->expects($this->never())
+            ->method('setEmailImported');
+
+        $this->contactResourceMock->expects($this->never())
+            ->method('save');
+
+        $returnedId = $this->contactManager->prepareDotdigitalContact(
+            $this->contactModelMock,
+            $this->subscriberModelMock,
+            $automationDataFields,
+            AutomationTypeHandler::AUTOMATION_TYPE_NEW_SUBSCRIBER
+        );
+
+        $this->assertEquals($contactId, $returnedId);
+    }
+
     public function testExceptionThrownIfContactStatusIsPendingOptIn()
     {
         $email = 'chaz@emailsim.io';

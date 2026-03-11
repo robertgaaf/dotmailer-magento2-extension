@@ -103,7 +103,7 @@ class ContactManager
         ?string $optInType = null
     ): int {
         $addressBookId = 0;
-        $dataFields = [];
+        $dataFields = $automationDataFields;
         $email = $contact->getEmail();
         $websiteId = (int) $contact->getWebsiteId();
 
@@ -129,7 +129,12 @@ class ContactManager
             );
         }
 
-        $sdkContact = $this->buildSdkContact($email, $dataFields, $optInType, $addressBookId);
+        $sdkContact = $this->buildSdkContact(
+            $email,
+            $this->dataFieldCollector->flatten($dataFields),
+            $optInType,
+            $addressBookId
+        );
 
         $response = $this->pushContactToDotdigital(
             $email,
