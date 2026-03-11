@@ -173,29 +173,98 @@ class DataFieldCollector
     /**
      * Merge data fields.
      *
-     * Merge a set of 'new' data fields into an 'original' set,
-     * preparing the data structure for an API request in the process.
+     * Merge a set of 'new' exported data fields into an 'original' set
+     * of automation-specific data fields, preserving the structured format.
      * Note that original keys are not overwritten with new values.
      *
-     * @param array $originalDataFields
-     * @param array<DataField> $newDataFields
+     * @param array $originalDataFields Array of structured data fields with 'Key' and 'Value' keys
+     *                                  e.g., [['Key' => 'STORE_NAME', 'Value' => 'My Store']]
+     * @param array<DataField> $newDataFields Array of DataField objects to merge
      *
-     * @return array
+     * @return array Array of structured data fields e.g., [['Key' => 'STORE_NAME', 'Value' => 'My Store'], ...]
      */
     public function mergeFields(array $originalDataFields, array $newDataFields): array
     {
-        $combinedDataFields = $originalDataFields;
-        $originalKeys = array_column($originalDataFields, 'Key');
+        $combinedDataFields = [];
+        $originalKeys = [];
 
-        foreach ($newDataFields as $newDataField) {
-            if (in_array($newDataField->getKey(), $originalKeys)) {
+        foreach ($originalDataFields as $dataField) {
+            if (!is_array($dataField) || !isset($dataField['Key']) || !isset($dataField['Value'])) {
                 continue;
             }
+
+            $fieldKey = $dataField['Key'];
+            $fieldValue = $dataField['Value'];
+
+            if (!is_string($fieldKey) || $fieldKey === '') {
+                continue;
+            }
+
             $combinedDataFields[] = [
-                'Key' => $newDataField->getKey(),
-                'Value' => $newDataField->getValue()
+                'Key' => $fieldKey,
+                'Value' => $fieldValue,
+            ];
+            $originalKeys[] = $fieldKey;
+        }
+
+        foreach ($newDataFields as $newDataField) {
+            if (!is_object($newDataField)) {
+                continue;
+            }
+
+            if (!method_exists($newDataField, 'getKey') || !method_exists($newDataField, 'getValue')) {
+                continue;
+            }
+
+            $key = $newDataField->getKey();
+
+            if (in_array($key, $originalKeys, true)) {
+                continue;
+            }
+
+            if (!is_string($key) || $key === '') {
+                continue;
+            }
+
+            $combinedDataFields[] = [
+                'Key' => $key,
+                'Value' => $newDataField->getValue(),
             ];
         }
+
         return $combinedDataFields;
+    }
+
+    /**
+     * Flatten data fields.
+     *
+     * Convert a structured data fields array (with 'Key' and 'Value' keys)
+     * into a simple associative array suitable for passing to SdkContact::setDataFields().
+     *
+     * @param array $dataFields Array of structured data fields with 'Key' and 'Value' keys
+     *                          e.g., [['Key' => 'STORE_NAME', 'Value' => 'My Store']]
+     *
+     * @return array Simple associative array e.g., ['STORE_NAME' => 'My Store', 'CUSTOMER_ID' => '123']
+     */
+    public function flatten(array $dataFields): array
+    {
+        $flattenedDataFields = [];
+
+        foreach ($dataFields as $dataField) {
+            if (!is_array($dataField) || !isset($dataField['Key']) || !isset($dataField['Value'])) {
+                continue;
+            }
+
+            $fieldKey = $dataField['Key'];
+            $fieldValue = $dataField['Value'];
+
+            if (!is_string($fieldKey) || $fieldKey === '') {
+                continue;
+            }
+
+            $flattenedDataFields[$fieldKey] = $fieldValue;
+        }
+
+        return $flattenedDataFields;
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Dotdigitalgroup\Email\Model\Queue\Sync\Automation;
 
+use Dotdigital\Exception\ResponseValidationException;
 use Dotdigitalgroup\Email\Exception\PendingOptInException;
 use Dotdigitalgroup\Email\Helper\Data;
 use Dotdigitalgroup\Email\Logger\Logger;
@@ -167,6 +168,21 @@ class AutomationConsumer
             $this->automationResource->setStatusAndSaveAutomation(
                 $automation,
                 StatusInterface::PENDING_OPT_IN
+            );
+            return false;
+        } catch (ResponseValidationException $e) {
+            $this->automationResource->setStatusAndSaveAutomation(
+                $automation,
+                StatusInterface::FAILED,
+                $e->getMessage()
+            );
+            $this->logger->error(
+                sprintf(
+                    'Automation enrolment assembly error for automation id: %s, message: %s',
+                    $automation->getId(),
+                    $e->getMessage()
+                ),
+                [$e->getDetails()]
             );
             return false;
         } catch (\Exception $e) {
