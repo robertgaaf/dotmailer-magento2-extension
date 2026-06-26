@@ -100,7 +100,7 @@ class EnableConnectorCommand extends Command
      * @return int
      * @throws \Symfony\Component\Console\Exception\ExceptionInterface
      */
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $this->output = $output;
         $username = $input->getOption('username');
