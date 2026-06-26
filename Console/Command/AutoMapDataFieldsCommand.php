@@ -42,7 +42,7 @@ class AutoMapDataFieldsCommand extends Command
      * @param OutputInterface $output
      * @return int
      */
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $output->writeln(__('Auto-mapping data fields')->getText());
 
