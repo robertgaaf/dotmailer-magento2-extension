@@ -56,7 +56,7 @@ class ImportDataCommand extends Command
      * @throws InputException
      * @throws LocalizedException
      */
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $requestedTable = $input->getOption('table');
         $availableTables = $this->migrateData->getTablesFromAvailableTypes();
