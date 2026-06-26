@@ -63,7 +63,7 @@ class TaskRunnerCommand extends Command
      * @return int
      * @throws LocalizedException
      */
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         try {
             $this->state->setAreaCode(Area::AREA_CRONTAB);
